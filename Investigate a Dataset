@@ -1,0 +1,229 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+% matplotlib inline
+
+# Upgrade pandas to use dataframe.explode() function. 
+!pip install --upgrade pandas==0.25.0
+
+# Load your data and print out a few lines. Perform operations to inspect data
+#   types and look for instances of missing or possibly errant data.
+df = pd.read_csv('noshowappointments-kagglev2-may-2016 .csv')
+df.head()
+df.info()
+df.shape
+df.describe()
+print(df.nunique()[0] / df.nunique()[1]) # percentage of patients of books more than 1 appointments
+df.nunique()
+df.columns
+for i in df.columns:
+    print(i+":",df[i].nunique())
+df_noshow = pd.DataFrame(df['No-show'].value_counts())
+df_noshow = df_noshow.T
+df_noshow['total'] = df_noshow['No'] + df_noshow['Yes']
+df_noshow['no_perc'] = (df_noshow['Yes'] / df_noshow['total']) * 100
+df_noshow   
+df['ScheduledDay'] = pd.to_datetime(df['ScheduledDay']).dt.date.astype('datetime64[ns]')
+df['AppointmentDay']= pd.to_datetime(df['AppointmentDay']).dt.date.astype('datetime64[ns]')
+df.head(2)
+df['Age'].value_counts()
+df.Handcap.value_counts()
+df.duplicated().sum()
+# After discussing the structure of the data and any problems that need to be
+#   cleaned, perform those cleaning steps in the second part of this section.
+# drop the data of patient with age equal to -1
+df.drop(index = df[df.Age == -1].index, inplace=True)
+# drop the data of patient with age equal to 0
+df.drop(index = df[df.Age == 0].index, inplace=True)
+df.Age.describe()
+# Histogram plot of Age
+df.Age.hist(bins=25,figsize=(20,6)) 
+plt.xlabel("Age") 
+plt.ylabel("Count") 
+plt.title("Age Histogram");
+df.shape
+df['ScheduledDay'] = pd.to_datetime(df['ScheduledDay'])
+df['AppointmentDay'] = pd.to_datetime(df['AppointmentDay'])
+# extract the date from the ScheduledDay
+df['ScheduledDate'] = df['ScheduledDay'].dt.date
+df['ScheduledDate'] =  pd.to_datetime(df['ScheduledDate'])
+# rename the AppointmentDay column
+df.rename(columns={'AppointmentDay': 'AppointmentDate'}, inplace=True)
+# calculate the days between AppointmentDate and ScheduledDate
+df['DaysInBetween'] = df['AppointmentDate'] - df['ScheduledDate']
+df.tail(5)
+# convert the data type to string
+df['DaysInBetween'] = df['DaysInBetween'].astype(str)
+# Extract int from strings in the DaysInBetween column
+df['DaysInBetween'] = df['DaysInBetween'].str.extract('(\d+)', expand=True).astype(int)
+df.tail(5)
+df['Show-up'] = np.ones((len(df), 1), dtype=int)
+df.loc[df['No-show'] == 'Yes', 'Show-up'] = 0
+df.head(10)
+df.drop(['PatientId', 'ScheduledDay', 'No-show'] , axis=1, inplace=True)
+df.set_index('AppointmentID', inplace=True)
+df.head()
+# create masks 
+presence = df['Show-up'] == 1
+absence = df['Show-up'] == 0
+print(round(df.Gender.value_counts()/len(df)*100))
+#
+df.Gender.value_counts().plot(kind="bar")
+plt.title("Gender");
+df["Gender"].value_counts().plot(kind="pie",labels=["Females","Males"],   autopct='%1.0f%%')
+plt.ylabel("Count")
+plt.title("Gender");
+print("The ratio of females to males : (",(df.Gender == "F").sum() ,":", (df.Gender == "M").sum() ,") -> ", round((df.Gender == "F").sum() / (df.Gender == "M").sum(),2),sep="" )
+df['Show-up'].describe()
+# count how many female patients who show up for appointments, 
+# and do the same counting for male patients
+gender_counts = df.groupby('Gender')['Show-up'].value_counts()
+gender_counts
+# get the total number of female patients and male patients
+gender_totals = df.groupby('Gender').count()['Show-up']
+gender_totals
+# calculate the show-up rate for female patients
+Female_proportions = gender_counts['F'] / gender_totals['F']
+Female_proportions
+# calculate the show-up rate for male patients
+Male_proportions = gender_counts['M'] / gender_totals['M']
+Male_proportions
+ind = np.arange(len(Female_proportions))  # the x locations for the groups
+width = 0.2       # the width of the bars
+# plot bars
+red_bars = plt.bar(ind, Female_proportions, width, color='g', alpha=.5, label='Female')
+blue_bars = plt.bar(ind + width, Male_proportions, width, color='y', alpha=.5, label='Male')
+# title and labels
+plt.ylabel('Proportion of patients')
+plt.title('Investigate the influece of gender')
+locations = ind + width / 2  # xtick locations
+labels = ['Show-up', 'No-show-up']  # xtick labels
+plt.xticks(locations, labels)
+# legend
+plt.legend();
+### Research Question 3 Are patients more willing to go to the appointment that is scheduled in the near future?
+# Plot a histogram to show the distribution 
+s1 = df.DaysInBetween[presence]
+s2 = df.DaysInBetween[absence]
+(n1, bins1, patches1) = plt.hist(s1, bins=10, alpha =0.5, color='red', label='Presence')
+(n2, bins2, patches2) = plt.hist(s2, bins=10, alpha =0.5, color='orange', label='Absence')
+plt.legend()
+plt.ylabel('Number of appointments')
+plt.xlabel('Days in between')
+plt.title('Appointment attendance VS days between the scheduled and appointment date');
+# show the edges of each bin
+if (bins1 == bins2).all():
+    print(bins1)
+    a1 = np.array(bins1[0:10])
+a1 = a1.reshape(len(a1), 1)
+a2 = np.array(bins2[1:11])
+a2 = a2.reshape(len(a2), 1)
+a3 = np.hstack((a1, a2))
+a3 = np.ceil(a3)  # round up a number
+binlist = []
+for i in range(4):
+    tmpstr = "[{} ~ {}]".format(str(int(a3[i][0])), str(int(a3[i][1])))
+    binlist.append(tmpstr) 
+heights = n2/(n1+n2)
+heights = heights[0 : 4]
+locations = [1,2,3,4]
+labels = binlist
+plt.bar(locations, heights, alpha =0.5, color='green', tick_label=labels)
+plt.ylabel('Proportion of absence')
+plt.xlabel('Waiting time of an appointment')
+plt.title('Investigate the influence of appointment waiting time');
+### Research Qusestion 4 How activities done by an appointment scheduling office (sending SMS) influence show / no-show ratio? 
+# find the percentage of No-SMS
+df.SMS_received.value_counts()[0]/len(df)
+# find the mean show-up rate for two groups of patients: SMS-received vs No-SMS
+df.groupby('SMS_received')['Show-up'].mean()
+# Calculate the show-up and no-show-up rates for two groups of patients
+SMSreceived_counts = df.groupby('SMS_received')['Show-up'].value_counts()
+SMSreceived_totals = df.groupby('SMS_received').count()['Show-up']
+SMS_proportions = SMSreceived_counts[1] / SMSreceived_totals[1]
+NoSMS_proportions = SMSreceived_counts[0] / SMSreceived_totals[0]
+ind = np.arange(len(SMS_proportions))  # the x locations for the groups
+width = 0.2       # the width of the bars
+
+# plot bars
+blue_bars = plt.bar(ind, NoSMS_proportions, width, color='b', alpha=.7, label='No-SMS')
+red_bars = plt.bar(ind + width, SMS_proportions, width, color='r', alpha=.7, label='SMS-received')
+# title and labels
+plt.ylabel('Proportion of patients')
+plt.title('Investigate the influence of SMS')
+locations = ind + width / 2  # xtick locations
+labels = ['Show-up', 'No-show-up']  # xtick labels
+plt.xticks(locations, labels)
+# legend
+plt.legend();
+### Research Question 5 What's the difference between show-up rate for patient at different age?
+s1 = df.Age[presence]
+s2 = df.Age[absence]
+(n1, bins1, patches1) = plt.hist(s1, bins=10, alpha =0.5, color='green', label='show-up')
+(n2, bins2, patches2) = plt.hist(s2, bins=10, alpha =0.5, color='orange', label='no-show-up')
+plt.legend()
+plt.ylabel('Number of appointments')
+plt.xlabel('Patient age')
+plt.title('Appointment attendance VS patient age');
+# show the edges of each bin
+if (bins1 == bins2).all():
+    print(bins1)
+  a1 = np.array(bins1[0:10])
+a1 = a1.reshape(len(a1), 1)
+
+a2 = np.array(bins2[1:11])
+a2 = a2.reshape(len(a2), 1)
+
+a3 = np.hstack((a1, a2))
+a3 = np.ceil(a3)  # round up a number
+
+binlist = []
+for i in range(8):
+    tmpstr = "[{} ~ {}]".format(str(int(a3[i][0])), str(int(a3[i][1])))
+    binlist.append(tmpstr) 
+    
+heights = n1/(n1+n2)
+heights = heights[0 : 8]
+
+locations = [1,2,3,4,5,6,7,8]
+labels = binlist
+plt.bar(locations, heights, alpha =0.5, color='blue', tick_label=labels)
+plt.ylabel('Show-up rate')
+plt.xlabel('Patient age')
+plt.title('Investigate the influence of patient age');
+### Research Question 6 How is the health status for patients who did not show-up at medical appointments?
+# count the number of patients didn't show up for appointments
+absence_count = len(df[absence])
+absence_count
+NoWel_absence_ratio = df.Scholarship[absence].value_counts()[0]/absence_count
+NoHipert_absence_ratio = df.Hipertension[absence].value_counts()[0]/absence_count
+NoDiab_absence_ratio = df.Diabetes[absence].value_counts()[0]/absence_count
+NoAlco_absence_ratio = df.Alcoholism[absence].value_counts()[0]/absence_count
+NoSMS_absence_ratio = df.SMS_received[absence].value_counts()[0]/absence_count
+Wel_absence_ratio = df.Scholarship[absence].value_counts()[1]/absence_count
+Hipert_absence_ratio = df.Hipertension[absence].value_counts()[1]/absence_count
+Diab_absence_ratio = df.Diabetes[absence].value_counts()[1]/absence_count
+Alco_absence_ratio = df.Alcoholism[absence].value_counts()[1]/absence_count
+SMS_absence_ratio = df.SMS_received[absence].value_counts()[1]/absence_count
+No_absence_ratios = [NoWel_absence_ratio, NoHipert_absence_ratio, NoDiab_absence_ratio, NoAlco_absence_ratio, NoSMS_absence_ratio]
+Yes_absence_ratios = [Wel_absence_ratio, Hipert_absence_ratio, Diab_absence_ratio, Alco_absence_ratio, SMS_absence_ratio]
+ind = np.arange(len(No_absence_ratios))  # the x locations for the groups
+width = 0.2       # the width of the bars
+
+# plot bars
+green_bars = plt.bar(ind, No_absence_ratios, width, color='g', alpha=.7, label='No')
+red_bars = plt.bar(ind + width, Yes_absence_ratios, width, color='r', alpha=.7, label='Yes')
+
+# title and labels
+plt.ylabel('Percentage')
+plt.title('Investigate the characteristics of patients who did not show up for appointments')
+locations = ind + width / 2  # xtick locations
+labels = ['Scholarship', 'Hipertension', 'Diabetes', 'Alcoholism', 'SMS_received']  # xtick labels
+plt.xticks(locations, labels)
+
+# legend
+plt.legend();
+from subprocess import call
+call(['python', '-m', 'nbconvert', 'Investigate_a_Dataset.ipynb'])
